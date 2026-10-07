@@ -1,0 +1,8 @@
+{
+  "name": "Addis Baltina - Ethiopian Baltina E-Commerce & Mini App",
+  "description": "Production-grade Ethiopian Baltina e-commerce platform and Telegram Mini App for authentic spices, grains, flours, and traditional foods with multilingual support, inventory management, and realtime order tracking.",
+  "permissions": [],
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

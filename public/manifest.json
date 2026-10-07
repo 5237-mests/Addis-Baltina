@@ -1,0 +1,16 @@
+{
+  "name": "Addis Baltina",
+  "short_name": "Baltina",
+  "description": "Authentic Ethiopian spices, grains, flours, and traditional foods",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#7f1d1d",
+  "theme_color": "#991b1b",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml"
+    }
+  ]
+}

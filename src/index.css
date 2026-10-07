@@ -1,0 +1,39 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --color-primary: #991b1b;
+    --color-primary-dark: #7f1d1d;
+    --color-accent: #d97706;
+    --color-surface: #fafaf9;
+    --color-surface-dark: #1c1917;
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(153, 27, 27, 0.25);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(153, 27, 27, 0.45);
+}
+
+/* Telegram Mini App Container Emulation */
+.tg-container {
+  max-width: 440px;
+  margin: 0 auto;
+  border-radius: 28px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  border: 8px solid #292524;
+  overflow: hidden;
+  position: relative;
+  min-height: 840px;
+}
