@@ -11,8 +11,15 @@ Base URL: `/api/v1`
 - `GET /api/v1/products`: List products.
   - Query params: `category` (slug), `search` (text query).
 - `GET /api/v1/products/:id`: Get single product details.
+- `POST /api/v1/products`: Create a new product (with Cloudinary image URL).
+- `PATCH /api/v1/products/:id`: Update product fields (price, stock, image_url, etc.).
 
-### 3. Orders
+### 3. Image Storage (Cloudinary)
+- `GET /api/v1/upload/status`: Check Cloudinary connection status & configuration info.
+- `POST /api/v1/upload`: Upload image to Cloudinary (accepts base64 data URI or image URL).
+- `DELETE /api/v1/upload/:public_id`: Remove image from Cloudinary storage.
+
+### 4. Orders
 - `POST /api/v1/orders`: Create authoritative order.
   - Body: `{ customer_name, customer_phone, delivery_subcity, delivery_woreda?, delivery_landmark?, payment_method, payment_reference?, items: [{ product_id, quantity }], idempotency_key?, source? }`
 - `GET /api/v1/orders`: List orders (supports `status` and `search` query).

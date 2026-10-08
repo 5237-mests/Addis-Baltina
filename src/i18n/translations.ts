@@ -118,6 +118,13 @@ export const translations: Record<Language, Record<string, string>> = {
     'admin.restock': 'Restock',
     'admin.save': 'Save Changes',
     'admin.close': 'Close',
+    'admin.uploadImage': 'Upload Image (Cloudinary)',
+    'admin.cloudinaryActive': 'Cloudinary Connected',
+    'admin.cloudinaryDemo': 'Cloudinary Fallback Active',
+    'admin.dropImage': 'Click or drop image to upload',
+    'admin.uploading': 'Uploading to Cloudinary...',
+    'admin.editProduct': 'Edit Product',
+    'admin.addProduct': 'Add Product',
 
     // Telegram Banner
     'telegram.banner': 'Telegram Mini App Preview Mode Active',
@@ -240,6 +247,13 @@ export const translations: Record<Language, Record<string, string>> = {
     'admin.restock': 'ክምችት ጨምር',
     'admin.save': 'አስቀምጥ',
     'admin.close': 'ዝጋ',
+    'admin.uploadImage': 'ምስል ስቀል (ክላውዲነሪ)',
+    'admin.cloudinaryActive': 'ክላውዲነሪ ተገናኝቷል',
+    'admin.cloudinaryDemo': 'ክላውዲነሪ የሙከራ ሁኔታ',
+    'admin.dropImage': 'ምስል እዚህ ይጎትቱ ወይም ይምረጡ',
+    'admin.uploading': 'ምስል ወደ ክላውዲነሪ እየተጫነ ነው...',
+    'admin.editProduct': 'ምርት አስተካክል',
+    'admin.addProduct': 'አዲስ ምርት ጨምር',
 
     // Telegram Banner
     'telegram.banner': 'የቴሌግራም ሚኒ አፕ እይታ በርቷል',
@@ -362,6 +376,13 @@ export const translations: Record<Language, Record<string, string>> = {
     'admin.restock': 'Kuusaa Dabali',
     'admin.save': 'Olkaawi',
     'admin.close': 'Cufi',
+    'admin.uploadImage': 'Suuraa Olkaa\'i (Cloudinary)',
+    'admin.cloudinaryActive': 'Cloudinary Hojjechaa Jira',
+    'admin.cloudinaryDemo': 'Cloudinary Moodii Yaalii',
+    'admin.dropImage': 'Suuraa asitti buusi ykn filadhu',
+    'admin.uploading': 'Suuraan gara Cloudinary olkaa\'amaa jira...',
+    'admin.editProduct': 'Oomisha Gulaali',
+    'admin.addProduct': 'Oomisha Haaraa Dabali',
 
     // Telegram Banner
     'telegram.banner': 'Mini App Telegiraam Banaadha',

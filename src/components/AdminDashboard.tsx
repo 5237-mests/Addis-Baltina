@@ -12,6 +12,10 @@ import {
   Search,
   ArrowUpRight,
   ShieldCheck,
+  Upload,
+  Cloud,
+  Image as ImageIcon,
+  Plus,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { Order, OrderStatus, Product, AuditLog } from '../types';
@@ -28,25 +32,60 @@ export const AdminDashboard: React.FC = () => {
   const [orderFilter, setOrderFilter] = useState('ALL');
   const [orderSearch, setOrderSearch] = useState('');
 
+  // Cloudinary connection info
+  const [cloudinaryStatus, setCloudinaryStatus] = useState<{
+    configured: boolean;
+    cloud_name: string | null;
+  } | null>(null);
+
   // Stock adjustment modal state
   const [adjustingProduct, setAdjustingProduct] = useState<Product | null>(null);
   const [newStockValue, setNewStockValue] = useState<number>(0);
   const [adjustReason, setAdjustReason] = useState<'RESTOCK' | 'DAMAGE' | 'AUDIT_ADJUSTMENT'>('RESTOCK');
 
+  // Cloudinary Image upload modal state
+  const [editingPhotoProduct, setEditingPhotoProduct] = useState<Product | null>(null);
+  const [uploadPreview, setUploadPreview] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadResultInfo, setUploadResultInfo] = useState<{
+    provider: string;
+    url: string;
+    bytes?: number;
+  } | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  // New Product Modal state
+  const [isCreatingProduct, setIsCreatingProduct] = useState(false);
+  const [newProdForm, setNewProdForm] = useState({
+    category_id: 'cat-spices',
+    sku: `AB-NEW-${Math.floor(100 + Math.random() * 900)}`,
+    name_en: '',
+    name_am: '',
+    name_om: '',
+    description_en: '',
+    price: 380,
+    stock: 20,
+    unit: '500g',
+    image_url: 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&w=600&q=80',
+    origin: 'Addis Ababa, Ethiopia',
+  });
+
   const loadData = async () => {
     setLoading(true);
     try {
-      const [statsRes, ordersRes, invRes, auditRes] = await Promise.all([
+      const [statsRes, ordersRes, invRes, auditRes, cloudRes] = await Promise.all([
         fetch('/api/v1/admin/stats').then((r) => r.json()),
         fetch('/api/v1/orders').then((r) => r.json()),
         fetch('/api/v1/inventory').then((r) => r.json()),
         fetch('/api/v1/admin/audit-logs').then((r) => r.json()),
+        fetch('/api/v1/upload/status').then((r) => r.json()).catch(() => ({ success: false })),
       ]);
 
       if (statsRes.success) setStats(statsRes.data);
       if (ordersRes.success) setOrders(ordersRes.data);
       if (invRes.success) setProducts(invRes.data.products);
       if (auditRes.success) setAuditLogs(auditRes.data);
+      if (cloudRes?.success) setCloudinaryStatus(cloudRes.data);
     } catch (err) {
       console.error('Error fetching admin data:', err);
     } finally {
@@ -100,6 +139,87 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
+  // Handle file select for Cloudinary
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadError(null);
+    setUploadResultInfo(null);
+    const reader = new FileReader();
+    reader.onload = () => {
+      setUploadPreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Handle Cloudinary upload & update product
+  const handleUploadToCloudinary = async () => {
+    if (!uploadPreview || !editingPhotoProduct) return;
+    setIsUploading(true);
+    setUploadError(null);
+    try {
+      const res = await fetch('/api/v1/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          image: uploadPreview,
+          folder: 'addis_baltina/products',
+          tags: ['addis_baltina', editingPhotoProduct.sku],
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error?.message || 'Failed to upload image to Cloudinary');
+      }
+
+      const uploadedUrl = data.data.url;
+      setUploadResultInfo({
+        provider: data.data.provider,
+        url: uploadedUrl,
+        bytes: data.data.bytes,
+      });
+
+      // Update the product's image_url
+      await fetch(`/api/v1/products/${editingPhotoProduct.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image_url: uploadedUrl }),
+      });
+
+      loadData();
+    } catch (err: any) {
+      setUploadError(err.message || 'Upload failed');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  // Handle creating a new product
+  const handleCreateNewProduct = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await fetch('/api/v1/products', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...newProdForm,
+          name_am: newProdForm.name_am || newProdForm.name_en,
+          name_om: newProdForm.name_om || newProdForm.name_en,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setIsCreatingProduct(false);
+        loadData();
+      } else {
+        alert(data.error?.message || 'Failed to create product');
+      }
+    } catch (err: any) {
+      alert(err.message || 'Error creating product');
+    }
+  };
+
   if (!isAdminOpen) return null;
 
   const filteredOrders = orders.filter((o) => {
@@ -138,6 +258,27 @@ export const AdminDashboard: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Cloudinary Status Indicator */}
+            <div
+              className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border border-stone-200 dark:border-stone-800 bg-stone-100 dark:bg-stone-800/80 shadow-xs"
+              title={
+                cloudinaryStatus?.configured
+                  ? `Cloudinary CDN active for cloud: ${cloudinaryStatus.cloud_name}`
+                  : 'Cloudinary credentials not set in .env. Local storage fallback active.'
+              }
+            >
+              <Cloud className={`w-3.5 h-3.5 ${cloudinaryStatus?.configured ? 'text-emerald-500 animate-pulse' : 'text-amber-500'}`} />
+              {cloudinaryStatus?.configured ? (
+                <span className="text-emerald-600 dark:text-emerald-400">
+                  Cloudinary: {cloudinaryStatus.cloud_name}
+                </span>
+              ) : (
+                <span className="text-amber-600 dark:text-amber-400">
+                  Cloudinary: Demo Mode
+                </span>
+              )}
+            </div>
+
             <button
               onClick={loadData}
               disabled={loading}
@@ -368,21 +509,50 @@ export const AdminDashboard: React.FC = () => {
           {activeTab === 'inventory' && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <h3 className="font-bold text-sm text-stone-900 dark:text-stone-100">
-                  Authoritative Stock Levels & Product Inventory
-                </h3>
+                <div>
+                  <h3 className="font-bold text-sm text-stone-900 dark:text-stone-100">
+                    Authoritative Stock Levels & Product Inventory
+                  </h3>
+                  <p className="text-xs text-stone-500">
+                    Manage product photos via Cloudinary image storage and adjust live inventory
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setNewProdForm({
+                      category_id: 'cat-spices',
+                      sku: `AB-SP-0${products.length + 1}`,
+                      name_en: '',
+                      name_am: '',
+                      name_om: '',
+                      description_en: '',
+                      price: 400,
+                      stock: 25,
+                      unit: '500g',
+                      image_url: 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&w=600&q=80',
+                      origin: 'Addis Ababa, Ethiopia',
+                    });
+                    setUploadPreview(null);
+                    setUploadResultInfo(null);
+                    setIsCreatingProduct(true);
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-stone-950 font-bold text-xs transition shadow-xs"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>{t('admin.addProduct')}</span>
+                </button>
               </div>
 
               <div className="border border-stone-200 dark:border-stone-800 rounded-2xl overflow-hidden">
                 <table className="w-full text-left text-xs">
                   <thead className="bg-stone-50 dark:bg-stone-800/60 text-stone-500 font-semibold border-b border-stone-200 dark:border-stone-800">
                     <tr>
-                      <th className="p-3">Product</th>
+                      <th className="p-3">Product & Photo</th>
                       <th className="p-3">SKU & Unit</th>
                       <th className="p-3">Current Stock</th>
                       <th className="p-3">Min Alert</th>
                       <th className="p-3">Status</th>
-                      <th className="p-3 text-right">Action</th>
+                      <th className="p-3 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-stone-200 dark:divide-stone-800">
@@ -391,10 +561,19 @@ export const AdminDashboard: React.FC = () => {
                       return (
                         <tr key={prod.id} className="hover:bg-stone-50 dark:hover:bg-stone-800/40">
                           <td className="p-3">
-                            <div className="font-bold text-stone-900 dark:text-stone-100">
-                              {prod.name_en}
+                            <div className="flex items-center gap-3">
+                              <img
+                                src={prod.image_url}
+                                alt={prod.name_en}
+                                className="w-10 h-10 rounded-xl object-cover shrink-0 border border-stone-200 dark:border-stone-800"
+                              />
+                              <div>
+                                <div className="font-bold text-stone-900 dark:text-stone-100">
+                                  {prod.name_en}
+                                </div>
+                                <div className="text-[11px] text-stone-400">{prod.origin}</div>
+                              </div>
                             </div>
-                            <div className="text-[11px] text-stone-400">{prod.origin}</div>
                           </td>
                           <td className="p-3 font-mono">
                             {prod.sku} ({prod.unit})
@@ -419,15 +598,31 @@ export const AdminDashboard: React.FC = () => {
                             )}
                           </td>
                           <td className="p-3 text-right">
-                            <button
-                              onClick={() => {
-                                setAdjustingProduct(prod);
-                                setNewStockValue(prod.stock);
-                              }}
-                              className="px-3 py-1 rounded-xl bg-amber-600 hover:bg-amber-500 text-stone-950 font-bold text-xs transition"
-                            >
-                              {t('admin.adjustStock')}
-                            </button>
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                onClick={() => {
+                                  setEditingPhotoProduct(prod);
+                                  setUploadPreview(prod.image_url);
+                                  setUploadResultInfo(null);
+                                  setUploadError(null);
+                                }}
+                                className="flex items-center gap-1 px-2.5 py-1 rounded-xl border border-stone-300 dark:border-stone-700 hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-300 font-semibold text-xs transition"
+                                title="Upload or change image via Cloudinary"
+                              >
+                                <Cloud className="w-3.5 h-3.5 text-amber-500" />
+                                <span>Photo</span>
+                              </button>
+
+                              <button
+                                onClick={() => {
+                                  setAdjustingProduct(prod);
+                                  setNewStockValue(prod.stock);
+                                }}
+                                className="px-3 py-1 rounded-xl bg-amber-600 hover:bg-amber-500 text-stone-950 font-bold text-xs transition"
+                              >
+                                {t('admin.adjustStock')}
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -521,6 +716,348 @@ export const AdminDashboard: React.FC = () => {
                   Save Stock
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Cloudinary Photo Edit Modal */}
+        {editingPhotoProduct && (
+          <div className="fixed inset-0 z-60 bg-stone-950/75 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-stone-900 rounded-3xl border border-stone-200 dark:border-stone-800 p-6 max-w-lg w-full shadow-2xl space-y-4">
+              <div className="flex items-center justify-between border-b border-stone-200 dark:border-stone-800 pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded-xl bg-amber-500/20 text-amber-500">
+                    <Cloud className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-black text-base text-stone-900 dark:text-stone-100">
+                      Cloudinary Image Storage
+                    </h3>
+                    <p className="text-xs text-stone-500">
+                      {editingPhotoProduct.name_en} ({editingPhotoProduct.sku})
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setEditingPhotoProduct(null);
+                    setUploadPreview(null);
+                    setUploadResultInfo(null);
+                    setUploadError(null);
+                  }}
+                  className="p-1.5 rounded-lg text-stone-400 hover:text-stone-100 transition"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Cloudinary Connection Note */}
+              <div className={`p-3 rounded-xl border text-xs flex items-center gap-2 ${
+                cloudinaryStatus?.configured
+                  ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/40 text-emerald-700 dark:text-emerald-300'
+                  : 'bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800/40 text-amber-700 dark:text-amber-300'
+              }`}>
+                <Cloud className="w-4 h-4 shrink-0" />
+                <span>
+                  {cloudinaryStatus?.configured
+                    ? `Connected to Cloudinary account (${cloudinaryStatus.cloud_name}). Images will be saved to Cloudinary CDN.`
+                    : 'Cloudinary credentials not set in .env. Images will be saved in demo mode. Configure CLOUDINARY_URL or CLOUDINARY_CLOUD_NAME to enable Cloudinary CDN.'}
+                </span>
+              </div>
+
+              {/* Image Preview & Upload Dropzone */}
+              <div className="space-y-3">
+                <div className="relative aspect-16/9 rounded-2xl bg-stone-100 dark:bg-stone-800 border-2 border-dashed border-stone-300 dark:border-stone-700 overflow-hidden flex flex-col items-center justify-center p-3 text-center">
+                  {uploadPreview ? (
+                    <img
+                      src={uploadPreview}
+                      alt="Preview"
+                      className="w-full h-full object-cover rounded-xl"
+                    />
+                  ) : (
+                    <div className="text-stone-500 space-y-1">
+                      <ImageIcon className="w-8 h-8 mx-auto text-stone-400" />
+                      <p className="text-xs font-semibold">{t('admin.dropImage')}</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* File picker & URL input */}
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <label className="flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-xl border border-stone-300 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-xs font-bold text-stone-700 dark:text-stone-300 cursor-pointer hover:bg-stone-100 dark:hover:bg-stone-700 transition">
+                      <Upload className="w-4 h-4 text-amber-500" />
+                      <span>Choose Image File (JPG, PNG, WebP)</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleFileSelect}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] text-stone-400">or URL:</span>
+                    <input
+                      type="url"
+                      placeholder="https://example.com/photo.jpg"
+                      value={uploadPreview?.startsWith('http') ? uploadPreview : ''}
+                      onChange={(e) => setUploadPreview(e.target.value)}
+                      className="flex-1 px-3 py-1.5 rounded-lg border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-800 text-xs text-stone-900 dark:text-stone-100"
+                    />
+                  </div>
+                </div>
+
+                {uploadError && (
+                  <div className="p-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs">
+                    {uploadError}
+                  </div>
+                )}
+
+                {uploadResultInfo && (
+                  <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/40 text-emerald-800 dark:text-emerald-300 text-xs space-y-1">
+                    <div className="font-bold flex items-center gap-1.5">
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>Uploaded Successfully to {uploadResultInfo.provider === 'cloudinary' ? 'Cloudinary CDN' : 'Local Storage'}!</span>
+                    </div>
+                    <div className="text-[11px] font-mono truncate text-stone-600 dark:text-stone-400">
+                      URL: {uploadResultInfo.url}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  onClick={() => {
+                    setEditingPhotoProduct(null);
+                    setUploadPreview(null);
+                    setUploadResultInfo(null);
+                    setUploadError(null);
+                  }}
+                  className="flex-1 py-2.5 rounded-xl border border-stone-300 dark:border-stone-700 text-xs font-bold hover:bg-stone-100 dark:hover:bg-stone-800 transition"
+                >
+                  Close
+                </button>
+                <button
+                  onClick={handleUploadToCloudinary}
+                  disabled={isUploading || !uploadPreview}
+                  className="flex-1 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-stone-950 text-xs font-black shadow-md transition flex items-center justify-center gap-2"
+                >
+                  <Cloud className="w-4 h-4" />
+                  <span>{isUploading ? t('admin.uploading') : 'Upload to Cloudinary & Save'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Add New Product Modal */}
+        {isCreatingProduct && (
+          <div className="fixed inset-0 z-60 bg-stone-950/75 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-stone-900 rounded-3xl border border-stone-200 dark:border-stone-800 p-6 max-w-lg w-full shadow-2xl space-y-4 max-h-[85vh] overflow-y-auto">
+              <div className="flex items-center justify-between border-b border-stone-200 dark:border-stone-800 pb-3">
+                <h3 className="font-black text-base text-stone-900 dark:text-stone-100">
+                  {t('admin.addProduct')}
+                </h3>
+                <button
+                  onClick={() => setIsCreatingProduct(false)}
+                  className="p-1.5 rounded-lg text-stone-400 hover:text-stone-100 transition"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleCreateNewProduct} className="space-y-3 text-xs">
+                <div>
+                  <label className="block font-bold text-stone-600 dark:text-stone-400 mb-1">
+                    Category
+                  </label>
+                  <select
+                    value={newProdForm.category_id}
+                    onChange={(e) => setNewProdForm({ ...newProdForm, category_id: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-900 dark:text-stone-100"
+                  >
+                    <option value="cat-spices">Spices & Blends (ቅመማ ቅመሞች)</option>
+                    <option value="cat-flours">Flours & Grains (እህሎችና ዱቄት)</option>
+                    <option value="cat-pastes">Pastes & Sauces (አዋዜና ማጣፈጫ)</option>
+                    <option value="cat-snacks">Traditional Snacks (የባህል መክሰሶች)</option>
+                    <option value="cat-coffee">Coffee & Baltina Drinks (ቡናና መጠጦች)</option>
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block font-bold text-stone-600 dark:text-stone-400 mb-1">
+                      SKU
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={newProdForm.sku}
+                      onChange={(e) => setNewProdForm({ ...newProdForm, sku: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-900 dark:text-stone-100 font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-stone-600 dark:text-stone-400 mb-1">
+                      Unit Size
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={newProdForm.unit}
+                      onChange={(e) => setNewProdForm({ ...newProdForm, unit: e.target.value })}
+                      placeholder="e.g. 500g, 1kg"
+                      className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-900 dark:text-stone-100"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-stone-600 dark:text-stone-400 mb-1">
+                    Product Name (English)
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={newProdForm.name_en}
+                    onChange={(e) => setNewProdForm({ ...newProdForm, name_en: e.target.value })}
+                    placeholder="e.g. Gurage Special Mitmita"
+                    className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-900 dark:text-stone-100"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block font-bold text-stone-600 dark:text-stone-400 mb-1">
+                      ስም (አማርኛ)
+                    </label>
+                    <input
+                      type="text"
+                      value={newProdForm.name_am}
+                      onChange={(e) => setNewProdForm({ ...newProdForm, name_am: e.target.value })}
+                      placeholder="የጉራጌ ልዩ ሚጥሚጣ"
+                      className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-900 dark:text-stone-100"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-stone-600 dark:text-stone-400 mb-1">
+                      Maqaa (Afaan Oromoo)
+                    </label>
+                    <input
+                      type="text"
+                      value={newProdForm.name_om}
+                      onChange={(e) => setNewProdForm({ ...newProdForm, name_om: e.target.value })}
+                      placeholder="Mitmiitaa Aadaa Addaa"
+                      className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-900 dark:text-stone-100"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block font-bold text-stone-600 dark:text-stone-400 mb-1">
+                      Price (ETB)
+                    </label>
+                    <input
+                      type="number"
+                      required
+                      min="1"
+                      value={newProdForm.price}
+                      onChange={(e) => setNewProdForm({ ...newProdForm, price: parseFloat(e.target.value) || 0 })}
+                      className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-900 dark:text-stone-100"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-stone-600 dark:text-stone-400 mb-1">
+                      Initial Stock (Units)
+                    </label>
+                    <input
+                      type="number"
+                      required
+                      min="0"
+                      value={newProdForm.stock}
+                      onChange={(e) => setNewProdForm({ ...newProdForm, stock: parseInt(e.target.value, 10) || 0 })}
+                      className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-900 dark:text-stone-100"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-stone-600 dark:text-stone-400 mb-1">
+                    Image Storage (Cloudinary URL or Upload)
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      required
+                      value={newProdForm.image_url}
+                      onChange={(e) => setNewProdForm({ ...newProdForm, image_url: e.target.value })}
+                      placeholder="https://res.cloudinary.com/..."
+                      className="flex-1 px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-900 dark:text-stone-100"
+                    />
+                    <label className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-stone-950 font-bold cursor-pointer transition">
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>Upload</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          const reader = new FileReader();
+                          reader.onload = async () => {
+                            const base64 = reader.result as string;
+                            try {
+                              const uploadRes = await fetch('/api/v1/upload', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                  image: base64,
+                                  folder: 'addis_baltina/products',
+                                }),
+                              });
+                              const data = await uploadRes.json();
+                              if (data.success) {
+                                setNewProdForm((prev) => ({ ...prev, image_url: data.data.url }));
+                              }
+                            } catch (err) {
+                              console.error('Image upload failed:', err);
+                            }
+                          };
+                          reader.readAsDataURL(file);
+                        }}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+                  {newProdForm.image_url && (
+                    <img
+                      src={newProdForm.image_url}
+                      alt="Preview"
+                      className="mt-2 w-full h-24 object-cover rounded-xl border border-stone-200 dark:border-stone-800"
+                    />
+                  )}
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsCreatingProduct(false)}
+                    className="flex-1 py-2.5 rounded-xl border border-stone-300 dark:border-stone-700 text-xs font-bold hover:bg-stone-100 dark:hover:bg-stone-800 transition"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-stone-950 text-xs font-black shadow-md transition"
+                  >
+                    Create Product
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}

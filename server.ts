@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { createServer } from 'http';
 import { createServer as createViteServer } from 'vite';
 import { db } from './src/server/db';
+import { uploadImage, deleteFromCloudinary, getCloudinaryConfigInfo } from './src/server/cloudinary';
 import crypto from 'crypto';
 
 const app = express();
@@ -12,7 +13,8 @@ const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 const isProduction = process.env.NODE_ENV === 'production';
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '15mb' }));
+app.use(express.urlencoded({ extended: true, limit: '15mb' }));
 
 // API Request Logger
 app.use((req, res, next) => {
@@ -91,6 +93,108 @@ app.get('/api/v1/products/:id', (req, res) => {
     return res.status(404).json({ success: false, error: { message: 'Product not found' } });
   }
   res.json({ success: true, data: product });
+});
+
+// Cloudinary Image Storage Endpoints
+app.get('/api/v1/upload/status', (_req, res) => {
+  const info = getCloudinaryConfigInfo();
+  res.json({
+    success: true,
+    data: info,
+  });
+});
+
+app.post('/api/v1/upload', async (req, res) => {
+  try {
+    const { image, folder, public_id, tags } = req.body;
+    if (!image || typeof image !== 'string') {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'Image data (base64 data URI or image URL) is required' },
+      });
+    }
+
+    const uploadResult = await uploadImage(image, { folder, public_id, tags });
+    res.json({
+      success: true,
+      data: uploadResult,
+    });
+  } catch (error: any) {
+    console.error('Upload handler error:', error);
+    res.status(500).json({
+      success: false,
+      error: { message: error.message || 'Image upload failed' },
+    });
+  }
+});
+
+app.delete('/api/v1/upload/:public_id', async (req, res) => {
+  try {
+    const publicId = req.params.public_id;
+    const deleted = await deleteFromCloudinary(publicId);
+    res.json({
+      success: true,
+      data: { deleted },
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      error: { message: error.message || 'Image delete failed' },
+    });
+  }
+});
+
+// Product Create & Update (with Cloudinary image support)
+app.post('/api/v1/products', (req, res) => {
+  try {
+    const productSchema = z.object({
+      category_id: z.string(),
+      sku: z.string(),
+      name_en: z.string().min(2),
+      name_am: z.string().min(2),
+      name_om: z.string().min(2),
+      description_en: z.string().default(''),
+      description_am: z.string().default(''),
+      description_om: z.string().default(''),
+      price: z.number().positive(),
+      stock: z.number().int().min(0),
+      min_stock_alert: z.number().int().min(1).default(5),
+      unit: z.string().default('500g'),
+      image_url: z.string().min(1),
+      is_active: z.boolean().default(true),
+      is_featured: z.boolean().default(false),
+      origin: z.string().default('Addis Ababa, Ethiopia'),
+      ingredients_en: z.string().optional(),
+      usage_en: z.string().optional(),
+    });
+
+    const parsed = productSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'Invalid product details', details: parsed.error.format() },
+      });
+    }
+
+    const newProd = db.createProduct(parsed.data);
+    res.status(201).json({ success: true, data: newProd });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: { message: error.message } });
+  }
+});
+
+app.patch('/api/v1/products/:id', (req, res) => {
+  try {
+    const product = db.getProductById(req.params.id);
+    if (!product) {
+      return res.status(404).json({ success: false, error: { message: 'Product not found' } });
+    }
+
+    const updated = db.updateProduct(req.params.id, req.body);
+    res.json({ success: true, data: updated });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: { message: error.message } });
+  }
 });
 
 // Orders

@@ -469,6 +469,52 @@ export class DatabaseStore {
     return this.products.get(id);
   }
 
+  public createProduct(params: Omit<Product, 'id'>): Product {
+    const id = `prod-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+    const newProduct: Product = {
+      ...params,
+      id,
+    };
+    this.products.set(id, newProduct);
+
+    this.auditLogs.unshift({
+      id: `audit-${Date.now()}`,
+      action: 'PRODUCT_CREATED',
+      entity_type: 'PRODUCT',
+      entity_id: id,
+      details: { name: newProduct.name_en, sku: newProduct.sku, image_url: newProduct.image_url },
+      performed_by: 'ADMIN',
+      created_at: new Date().toISOString(),
+    });
+
+    this.broadcast('product:created', newProduct);
+    return newProduct;
+  }
+
+  public updateProduct(id: string, updates: Partial<Product>): Product | null {
+    const existing = this.products.get(id);
+    if (!existing) return null;
+
+    const updatedProduct: Product = {
+      ...existing,
+      ...updates,
+    };
+    this.products.set(id, updatedProduct);
+
+    this.auditLogs.unshift({
+      id: `audit-${Date.now()}`,
+      action: 'PRODUCT_UPDATED',
+      entity_type: 'PRODUCT',
+      entity_id: id,
+      details: { updates },
+      performed_by: 'ADMIN',
+      created_at: new Date().toISOString(),
+    });
+
+    this.broadcast('product:updated', updatedProduct);
+    return updatedProduct;
+  }
+
   // Create Order with Authoritative Server Pricing & Stock Decrement & Idempotency
   public createOrder(params: {
     customer_name: string;
