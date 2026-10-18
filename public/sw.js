@@ -1,5 +1,5 @@
-// Addis Baltina - PWA Service Worker
-const CACHE_NAME = 'addis-baltina-v1';
+const BUILD_ID = new URL(self.location.href).searchParams.get('v') || Date.now().toString();
+const CACHE_NAME = `addis-baltina-${BUILD_ID}`;
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',

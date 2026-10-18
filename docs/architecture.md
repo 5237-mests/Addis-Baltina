@@ -1,8 +1,8 @@
-# Addis Baltina Architecture
+# Tsion Baltina Architecture
 
 ## Overview
 
-The Addis Baltina system follows a clean layered architecture designed to run reliably on shared hosting or VPS environments.
+The Tsion Baltina system follows a clean layered architecture designed to run reliably on shared hosting or VPS environments.
 
 ```
 Client (Web / Telegram Mini App / PWA)

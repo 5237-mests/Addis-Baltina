@@ -1,5 +1,5 @@
 -- ========================================================
--- Addis Baltina - Production Database Schema (MySQL 8.0+)
+-- Tsion Baltina - Production Database Schema (MySQL 8.0+)
 -- ========================================================
 
 CREATE DATABASE IF NOT EXISTS addis_baltina CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -41,7 +41,8 @@ CREATE TABLE IF NOT EXISTS products (
   origin VARCHAR(128) DEFAULT 'Addis Ababa, Ethiopia',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE RESTRICT
+  FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE RESTRICT,
+  INDEX idx_products_category_id (category_id)
 );
 
 -- Product Images Table
@@ -104,7 +105,10 @@ CREATE TABLE IF NOT EXISTS orders (
   source ENUM('TELEGRAM_MINI_APP', 'WEB', 'PWA') NOT NULL DEFAULT 'WEB',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
+  INDEX idx_orders_status (status),
+  INDEX idx_orders_created_at (created_at),
+  INDEX idx_orders_customer_phone (customer_phone)
 );
 
 -- Order Items Table

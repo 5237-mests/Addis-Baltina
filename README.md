@@ -1,8 +1,8 @@
-# Addis Baltina (አዲስ ባልትና)
+# Tsion Baltina (አዲስ ባልትና)
 
 > Authentic Ethiopian Baltina E-Commerce Platform & Telegram Mini App
 
-Addis Baltina is a production-grade full-stack e-commerce system built for distributing genuine Ethiopian stone-ground spices, grains, flours, and gourmet baltina essentials directly to households in Addis Ababa and beyond.
+Tsion Baltina is a production-grade full-stack e-commerce system built for distributing genuine Ethiopian stone-ground spices, grains, flours, and gourmet baltina essentials directly to households in Addis Ababa and beyond.
 
 ---
 
@@ -57,3 +57,26 @@ npm run dev
 npm run build
 npm start
 ```
+
+---
+
+## Documentation
+
+- **[Deployment Guide](docs/deployment.md)** — build, environment variables,
+  runtime, health checks, verification, and troubleshooting.
+- **[Fix Checklist](docs/fix-checklist.md)** — prioritized list of what must be
+  fixed before production.
+- **[Shared Hosting Deployment](docs/shared-hosting-deployment.md)** — deploying
+  to cPanel/Plesk-style hosting without root access.
+- **[VPS Migration](docs/vps-migration.md)** — Nginx, systemd/PM2, Docker, Redis,
+  and CI/CD.
+- **[Telegram Mini App Deployment](docs/telegram-mini-app-deployment.md)** —
+  BotFather setup, publishing, and authentication.
+- **[Backups and Restore](docs/backups.md)** — MySQL backup, restore, and
+  verification.
+- **[Cloudinary Setup](docs/cloudinary-setup.md)** — CDN image storage.
+- **[Architecture](docs/architecture.md)** and **[API Reference](docs/api.md)**.
+
+> **Deployment status:** the server currently uses an in-memory data store, so
+> data does not persist across restarts. See
+> [the database section](docs/deployment.md#6-database) before go-live.

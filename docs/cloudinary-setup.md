@@ -1,6 +1,6 @@
 # Cloudinary Image Storage Integration
 
-Addis Baltina includes first-class Cloudinary integration for storing and serving optimized product photos and promotional banners across the web, Progressive Web App (PWA), and Telegram Mini App.
+Tsion Baltina includes first-class Cloudinary integration for storing and serving optimized product photos and promotional banners across the web, Progressive Web App (PWA), and Telegram Mini App.
 
 ---
 

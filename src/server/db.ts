@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import {
   Category,
   Product,
@@ -9,6 +10,36 @@ import {
   PaymentMethod,
   OrderSource,
 } from '../types';
+import { commerceConfig } from './config';
+import { logger } from './logger';
+
+// In-memory collections must stay bounded so a long-running process cannot grow
+// without limit. The store is a stop-gap until MySQL persistence lands (P0).
+const NOTIFICATION_LIMIT = 200;
+const AUDIT_LOG_LIMIT = 500;
+const INVENTORY_TX_LIMIT = 1000;
+
+/** Deterministic JSON so key order does not change the payload fingerprint. */
+function stableStringify(value: unknown): string {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value) ?? 'null';
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
+  const obj = value as Record<string, unknown>;
+  return `{${Object.keys(obj)
+    .sort()
+    .map((key) => `${JSON.stringify(key)}:${stableStringify(obj[key])}`)
+    .join(',')}}`;
+}
+
+interface IdempotencyRecord {
+  orderId: string;
+  payloadHash: string;
+}
+
+export interface HealthStatus {
+  ok: boolean;
+  driver: string;
+  detail?: string;
+}
 
 export class DatabaseStore {
   private categories: Map<string, Category> = new Map();
@@ -17,7 +48,7 @@ export class DatabaseStore {
   private inventoryTransactions: InventoryTransaction[] = [];
   private auditLogs: AuditLog[] = [];
   private notifications: AppNotification[] = [];
-  private idempotencyKeys: Map<string, string> = new Map(); // key -> orderId
+  private idempotencyKeys: Map<string, IdempotencyRecord> = new Map();
   private listeners: Set<(event: string, data: any) => void> = new Set();
 
   constructor() {
@@ -29,12 +60,39 @@ export class DatabaseStore {
     return () => this.listeners.delete(listener);
   }
 
+  // --- Bounded collection helpers -----------------------------------------
+
+  private addNotification(notif: AppNotification): void {
+    this.notifications.unshift(notif);
+    if (this.notifications.length > NOTIFICATION_LIMIT) {
+      this.notifications.length = NOTIFICATION_LIMIT;
+    }
+  }
+
+  private addAuditLog(log: AuditLog): void {
+    this.auditLogs.unshift(log);
+    if (this.auditLogs.length > AUDIT_LOG_LIMIT) {
+      this.auditLogs.length = AUDIT_LOG_LIMIT;
+    }
+  }
+
+  private addInventoryTransaction(tx: InventoryTransaction): void {
+    this.inventoryTransactions.push(tx);
+    if (this.inventoryTransactions.length > INVENTORY_TX_LIMIT) {
+      // Drop the oldest transactions; newest are at the end.
+      this.inventoryTransactions.splice(0, this.inventoryTransactions.length - INVENTORY_TX_LIMIT);
+    }
+  }
+
   private broadcast(event: string, data: any) {
     this.listeners.forEach((cb) => {
       try {
         cb(event, data);
       } catch (err) {
-        console.error('SSE broadcast error:', err);
+        logger.warn('sse_broadcast_failed', {
+          event,
+          error: err instanceof Error ? err.message : String(err),
+        });
       }
     });
   }
@@ -424,7 +482,7 @@ export class DatabaseStore {
     this.orders.set(initialOrder.id, initialOrder);
     this.orders.set(initialOrder2.id, initialOrder2);
 
-    this.notifications.push({
+    this.addNotification({
       id: 'notif-1',
       title: 'New Order Received',
       message: 'Order AB-2026-1049 placed via Telegram Mini App by Dawit Bekele (820 ETB).',
@@ -477,7 +535,7 @@ export class DatabaseStore {
     };
     this.products.set(id, newProduct);
 
-    this.auditLogs.unshift({
+    this.addAuditLog({
       id: `audit-${Date.now()}`,
       action: 'PRODUCT_CREATED',
       entity_type: 'PRODUCT',
@@ -501,7 +559,7 @@ export class DatabaseStore {
     };
     this.products.set(id, updatedProduct);
 
-    this.auditLogs.unshift({
+    this.addAuditLog({
       id: `audit-${Date.now()}`,
       action: 'PRODUCT_UPDATED',
       entity_type: 'PRODUCT',
@@ -528,13 +586,34 @@ export class DatabaseStore {
     items: Array<{ product_id: string; quantity: number }>;
     idempotency_key?: string;
     source?: OrderSource;
-  }): { success: true; order: Order } | { success: false; error: string; code: string } {
+  }):
+    | { success: true; order: Order; replayed?: boolean }
+    | { success: false; error: string; code: string } {
+    // Fingerprint the request (without the idempotency key itself) so a reused
+    // key with a different cart/address is rejected instead of silently being
+    // treated as a replay.
+    const payloadHash = crypto
+      .createHash('sha256')
+      .update(stableStringify({ ...params, idempotency_key: undefined }))
+      .digest('hex');
+
     // 1. Check idempotency
-    if (params.idempotency_key && this.idempotencyKeys.has(params.idempotency_key)) {
-      const existingId = this.idempotencyKeys.get(params.idempotency_key)!;
-      const existingOrder = this.orders.get(existingId);
-      if (existingOrder) {
-        return { success: true, order: existingOrder };
+    if (params.idempotency_key) {
+      const record = this.idempotencyKeys.get(params.idempotency_key);
+      if (record) {
+        if (record.payloadHash !== payloadHash) {
+          return {
+            success: false,
+            error: 'This idempotency key was already used with a different order.',
+            code: 'IDEMPOTENCY_KEY_REUSE',
+          };
+        }
+        const existingOrder = this.orders.get(record.orderId);
+        if (existingOrder) {
+          return { success: true, order: existingOrder, replayed: true };
+        }
+        // Order vanished (should not happen while in-memory): fall through and
+        // let the normal flow recreate it under the same key.
       }
     }
 
@@ -575,16 +654,23 @@ export class DatabaseStore {
       });
     }
 
-    // 4. Calculate subtotal & delivery fee
+    // 4. Calculate subtotal, delivery fee, and tax from configuration.
     const subtotal = preparedItems.reduce((acc, curr) => acc + curr.subtotal, 0);
-    // Free delivery for orders >= 1200 ETB, else 100 ETB flat delivery fee across Addis Ababa
-    const delivery_fee = subtotal >= 1200 ? 0 : 100;
-    const tax = 0; // Agro-baltina tax exempt
+    const { freeDeliveryThreshold, flatDeliveryFee, taxRate } = commerceConfig;
+    const delivery_fee = subtotal >= freeDeliveryThreshold ? 0 : flatDeliveryFee;
+    const tax = Math.round(subtotal * taxRate);
     const total = subtotal + delivery_fee + tax;
 
-    // 5. Generate Order ID
-    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
-    const orderId = `AB-${new Date().getFullYear()}-${randomSuffix}`;
+    // 5. Generate an Order ID, guaranteeing uniqueness.
+    //    The random suffix is drawn from a 9,000-value space, so collisions are
+    //    possible; loop until we find a free id rather than silently overwriting
+    //    an existing order in the map below.
+    const orderYear = new Date().getFullYear();
+    let orderId: string;
+    do {
+      const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+      orderId = `AB-${orderYear}-${randomSuffix}`;
+    } while (this.orders.has(orderId));
 
     // 6. Deduct stock atomically and log transactions
     for (const item of preparedItems) {
@@ -593,7 +679,7 @@ export class DatabaseStore {
       item.product.stock = newStock;
       this.products.set(item.product.id, { ...item.product });
 
-      this.inventoryTransactions.push({
+      this.addInventoryTransaction({
         id: `tx-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
         product_id: item.product.id,
         change_amount: -item.quantity,
@@ -616,7 +702,7 @@ export class DatabaseStore {
           created_at: new Date().toISOString(),
           reference_id: item.product.id,
         };
-        this.notifications.unshift(notif);
+        this.addNotification(notif);
         this.broadcast('inventory:low', notif);
       }
     }
@@ -658,11 +744,11 @@ export class DatabaseStore {
     this.orders.set(orderId, newOrder);
 
     if (params.idempotency_key) {
-      this.idempotencyKeys.set(params.idempotency_key, orderId);
+      this.idempotencyKeys.set(params.idempotency_key, { orderId, payloadHash });
     }
 
     // Log audit
-    this.auditLogs.unshift({
+    this.addAuditLog({
       id: `audit-${Date.now()}`,
       action: 'ORDER_CREATED',
       entity_type: 'ORDER',
@@ -682,7 +768,7 @@ export class DatabaseStore {
       created_at: nowStr,
       reference_id: orderId,
     };
-    this.notifications.unshift(notif);
+    this.addNotification(notif);
 
     this.broadcast('order:created', newOrder);
     this.broadcast('notification:new', notif);
@@ -742,7 +828,7 @@ export class DatabaseStore {
           prod.stock = prev + item.quantity;
           this.products.set(prod.id, { ...prod });
 
-          this.inventoryTransactions.push({
+          this.addInventoryTransaction({
             id: `tx-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
             product_id: prod.id,
             change_amount: item.quantity,
@@ -762,7 +848,7 @@ export class DatabaseStore {
     this.orders.set(orderId, { ...order });
 
     // Audit log
-    this.auditLogs.unshift({
+    this.addAuditLog({
       id: `audit-${Date.now()}`,
       action: 'ORDER_STATUS_CHANGED',
       entity_type: 'ORDER',
@@ -781,7 +867,7 @@ export class DatabaseStore {
       created_at: new Date().toISOString(),
       reference_id: orderId,
     };
-    this.notifications.unshift(notif);
+    this.addNotification(notif);
 
     this.broadcast('order:status_changed', { orderId, status: newStatus, order });
     this.broadcast('notification:new', notif);
@@ -806,7 +892,7 @@ export class DatabaseStore {
     product.stock = params.newStock;
     this.products.set(product.id, { ...product });
 
-    this.inventoryTransactions.push({
+    this.addInventoryTransaction({
       id: `tx-${Date.now()}`,
       product_id: product.id,
       change_amount: diff,
@@ -817,7 +903,7 @@ export class DatabaseStore {
       created_at: new Date().toISOString(),
     });
 
-    this.auditLogs.unshift({
+    this.addAuditLog({
       id: `audit-${Date.now()}`,
       action: 'INVENTORY_ADJUSTED',
       entity_type: 'PRODUCT',
@@ -833,6 +919,17 @@ export class DatabaseStore {
 
   public getInventoryTransactions(): InventoryTransaction[] {
     return [...this.inventoryTransactions].reverse();
+  }
+
+  /**
+   * Dependency check for the health endpoint.
+   *
+   * The in-memory store is always reachable. When the MySQL repository lands
+   * (P0), ping the connection pool here and return `ok: false` with a detail
+   * message when it is unreachable, so `/api/v1/health` reports `degraded`.
+   */
+  public async healthCheck(): Promise<HealthStatus> {
+    return { ok: true, driver: 'memory', detail: 'in-memory store' };
   }
 
   public getAuditLogs(): AuditLog[] {
