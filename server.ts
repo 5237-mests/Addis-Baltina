@@ -4,7 +4,7 @@ import { createServer } from 'http';
 import { createApp } from './src/server/app';
 import { logger } from './src/server/logger';
 
-const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3003;
 const isProduction = process.env.NODE_ENV === 'production';
 
 async function startServer() {

@@ -1722,7 +1722,7 @@ data: ${JSON.stringify({ time: (/* @__PURE__ */ new Date()).toISOString() })}
 }
 
 // server.ts
-var PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3e3;
+var PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3003;
 var isProduction = process.env.NODE_ENV === "production";
 async function startServer() {
   const { app, closeRealtime } = createApp({ isProduction });
