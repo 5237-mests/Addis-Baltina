@@ -16,6 +16,7 @@ import {
   Cloud,
   Image as ImageIcon,
   Plus,
+  LogOut,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { Order, OrderStatus, Product, AuditLog } from '../types';
@@ -24,7 +25,7 @@ export const AdminDashboard: React.FC = () => {
   const { isAdminOpen, setIsAdminOpen, t } = useApp();
 
   const [activeTab, setActiveTab] = useState<'orders' | 'inventory' | 'audit'>('orders');
-  const [stats, setStats] = useState<any>(null);
+const [stats, setStats] = useState<any>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
@@ -32,7 +33,13 @@ export const AdminDashboard: React.FC = () => {
   const [orderFilter, setOrderFilter] = useState('ALL');
   const [orderSearch, setOrderSearch] = useState('');
 
-  // Cloudinary connection info
+// Admin authentication
+  const [authChecked, setAuthChecked] = useState(false);
+  const [authed, setAuthed] = useState(false);
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [loggingIn, setLoggingIn] = useState(false);
+
   const [cloudinaryStatus, setCloudinaryStatus] = useState<{
     configured: boolean;
     cloud_name: string | null;
@@ -70,22 +77,85 @@ export const AdminDashboard: React.FC = () => {
     origin: 'Addis Ababa, Ethiopia',
   });
 
+  // Orders pagination
+  const [ordersLimit, setOrdersLimit] = useState(50);
+  const [ordersPagination, setOrdersPagination] = useState<{
+    total: number;
+    limit: number;
+    offset: number;
+    hasMore: boolean;
+  } | null>(null);
+
+  const checkAuth = async () => {
+    try {
+      const res = await fetch('/api/v1/auth/admin/session');
+      const data = await res.json();
+      setAuthed(Boolean(data?.data?.authenticated));
+    } catch {
+      setAuthed(false);
+    } finally {
+      setAuthChecked(true);
+    }
+  };
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoggingIn(true);
+    setLoginError(null);
+    try {
+      const res = await fetch('/api/v1/auth/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: loginPassword }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setLoginPassword('');
+        setAuthed(true);
+      } else {
+        setLoginError(data.error?.message || 'Login failed');
+      }
+    } catch {
+      setLoginError('Could not reach the server.');
+    } finally {
+      setLoggingIn(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/v1/auth/admin/logout', { method: 'POST' });
+    } catch {
+      /* ignore */
+    }
+    setAuthed(false);
+    setAuthChecked(true);
+  };
+
   const loadData = async () => {
     setLoading(true);
     try {
       const [statsRes, ordersRes, invRes, auditRes, cloudRes] = await Promise.all([
         fetch('/api/v1/admin/stats').then((r) => r.json()),
-        fetch('/api/v1/orders').then((r) => r.json()),
+        fetch(`/api/v1/orders?limit=${ordersLimit}`).then((r) => r.json()),
         fetch('/api/v1/inventory').then((r) => r.json()),
         fetch('/api/v1/admin/audit-logs').then((r) => r.json()),
         fetch('/api/v1/upload/status').then((r) => r.json()).catch(() => ({ success: false })),
       ]);
 
       if (statsRes.success) setStats(statsRes.data);
-      if (ordersRes.success) setOrders(ordersRes.data);
+      if (ordersRes.success) {
+        setOrders(ordersRes.data);
+        setOrdersPagination(ordersRes.pagination || null);
+      }
       if (invRes.success) setProducts(invRes.data.products);
       if (auditRes.success) setAuditLogs(auditRes.data);
       if (cloudRes?.success) setCloudinaryStatus(cloudRes.data);
+
+      // Session expired / not authenticated: drop back to the login screen.
+      if (statsRes?.error?.code === 'UNAUTHORIZED') {
+        setAuthed(false);
+      }
     } catch (err) {
       console.error('Error fetching admin data:', err);
     } finally {
@@ -95,9 +165,20 @@ export const AdminDashboard: React.FC = () => {
 
   useEffect(() => {
     if (isAdminOpen) {
-      loadData();
+      checkAuth();
     }
   }, [isAdminOpen]);
+
+  useEffect(() => {
+    if (isAdminOpen && authed) {
+      loadData();
+    }
+  }, [isAdminOpen, authed, ordersLimit]);
+
+  const loadMoreOrders = async () => {
+    const newLimit = ordersLimit + 50;
+    setOrdersLimit(newLimit);
+  };
 
   // Handle Order status update
   const handleUpdateStatus = async (orderId: string, status: OrderStatus) => {
@@ -222,6 +303,63 @@ export const AdminDashboard: React.FC = () => {
 
   if (!isAdminOpen) return null;
 
+  if (!authChecked) {
+    return (
+      <div className="fixed inset-0 z-50 bg-stone-950/80 backdrop-blur-xs flex items-center justify-center">
+        <RefreshCw className="w-6 h-6 text-stone-300 animate-spin" />
+      </div>
+    );
+  }
+
+  if (!authed) {
+    return (
+      <div className="fixed inset-0 z-50 overflow-y-auto bg-stone-950/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 animate-fade-in">
+        <div className="relative w-full max-w-sm bg-white dark:bg-stone-900 rounded-3xl border border-stone-200 dark:border-stone-800 shadow-2xl p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2.5 rounded-2xl bg-amber-500/20 text-amber-600 dark:text-amber-400">
+              <ShieldCheck className="w-6 h-6" />
+            </div>
+            <div>
+              <h2 className="text-lg font-black text-stone-900 dark:text-stone-100">
+                {t('admin.title')}
+              </h2>
+              <p className="text-xs text-stone-500">Administrator sign-in required</p>
+            </div>
+          </div>
+          <form onSubmit={handleLogin} className="space-y-3">
+            <input
+              type="password"
+              autoFocus
+              value={loginPassword}
+              onChange={(e) => setLoginPassword(e.target.value)}
+              placeholder="Admin password"
+              className="w-full px-3 py-2.5 rounded-xl border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-950 text-stone-900 dark:text-stone-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/40"
+            />
+            {loginError && (
+              <p className="text-xs text-red-600 dark:text-red-400">{loginError}</p>
+            )}
+            <div className="flex gap-2">
+              <button
+                type="submit"
+                disabled={loggingIn}
+                className="flex-1 px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-sm transition disabled:opacity-60"
+              >
+                {loggingIn ? 'Signing in…' : 'Sign in'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsAdminOpen(false)}
+                className="px-4 py-2.5 rounded-xl border border-stone-300 dark:border-stone-700 text-stone-600 dark:text-stone-300 text-sm font-semibold hover:bg-stone-100 dark:hover:bg-stone-800 transition"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
   const filteredOrders = orders.filter((o) => {
     if (orderFilter !== 'ALL' && o.status !== orderFilter) return false;
     if (orderSearch) {
@@ -286,6 +424,13 @@ export const AdminDashboard: React.FC = () => {
               title="Refresh Data"
             >
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            </button>
+            <button
+              onClick={handleLogout}
+              className="p-2 rounded-xl text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800 transition"
+              title="Sign out"
+            >
+              <LogOut className="w-4 h-4" />
             </button>
             <button
               onClick={() => setIsAdminOpen(false)}
@@ -503,6 +648,18 @@ export const AdminDashboard: React.FC = () => {
                   </table>
                 </div>
               </div>
+
+              {ordersPagination?.hasMore && (
+                <div className="mt-4 flex justify-center">
+                  <button
+                    onClick={loadMoreOrders}
+                    disabled={loading}
+                    className="px-4 py-2 rounded-xl bg-stone-100 dark:bg-stone-800 text-xs font-bold text-stone-700 dark:text-stone-200 hover:bg-stone-200 dark:hover:bg-stone-700 border border-stone-300 dark:border-stone-700 transition"
+                  >
+                    {loading ? 'Loading...' : 'Load more orders'}
+                  </button>
+                </div>
+              )}
             </div>
           )}
 

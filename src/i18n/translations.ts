@@ -3,7 +3,7 @@ import { Language } from '../types';
 export const translations: Record<Language, Record<string, string>> = {
   en: {
     // Brand & Header
-    'brand.name': 'Addis Baltina',
+    'brand.name': 'Tsion Baltina',
     'brand.tagline': 'Authentic Ethiopian Spices & Baltina Heritage',
     'nav.catalog': 'Products',
     'nav.orders': 'Track Order',
@@ -77,8 +77,8 @@ export const translations: Record<Language, Record<string, string>> = {
     'checkout.telebirr': 'Telebirr (Mobile Payment)',
     'checkout.cbeBirr': 'CBE Birr / CBE Mobile',
     'checkout.inStore': 'Pickup at Baltina Hub',
-    'checkout.telebirrInstructions': 'Send ETB payment to Telebirr Merchant: 0911-234-567 (Addis Baltina). Enter transaction reference below:',
-    'checkout.cbeInstructions': 'Transfer to CBE Account: 1000-2491-0391 (Addis Baltina). Enter transaction reference below:',
+    'checkout.telebirrInstructions': 'Send ETB payment to Telebirr Merchant: 0911-234-567 (Tsion Baltina). Enter transaction reference below:',
+    'checkout.cbeInstructions': 'Transfer to CBE Account: 1000-2491-0391 (Tsion Baltina). Enter transaction reference below:',
     'checkout.referencePlaceholder': 'Transaction reference / SMS code',
     'checkout.placeOrder': 'Confirm & Place Order',
     'checkout.placing': 'Authorizing Order...',
@@ -132,7 +132,7 @@ export const translations: Record<Language, Record<string, string>> = {
   },
   am: {
     // Brand & Header
-    'brand.name': 'አዲስ ባልትና',
+    'brand.name': 'ፅዮን ባልትና',
     'brand.tagline': 'የኢትዮጵያ ባህላዊ ቅመሞችና የባልትና ውጤቶች',
     'nav.catalog': 'ምርቶች',
     'nav.orders': 'ትዕዛዝ መከታተያ',
@@ -148,7 +148,7 @@ export const translations: Record<Language, Record<string, string>> = {
     'hero.shopNow': 'ምርቶችን ይመልከቱ',
     'hero.trackOrder': 'ትዕዛዝ ይከታተሉ',
     'hero.feature1': '100% ተፈጥሯዊና ንጹህ',
-    'hero.feature2': 'ፈጣን የአዲስ አበባ ማድረስ',
+    'hero.feature2': 'ፈጣን የአዳማ አበባ ማድረስ',
     'hero.feature3': 'በቴሌብር ወይም በእጅ ክፍያ',
 
     // Categories
@@ -206,7 +206,7 @@ export const translations: Record<Language, Record<string, string>> = {
     'checkout.telebirr': 'በቴሌብር (Telebirr)',
     'checkout.cbeBirr': 'በሲቢኢ ብር / ንግድ ባንክ',
     'checkout.inStore': 'ከመደብራችን መውሰድ',
-    'checkout.telebirrInstructions': 'ክፍያውን ወደ ቴሌብር 0911-234-567 (አዲስ ባልትና) ይላኩ። የማረጋገጫ ቁጥሩን ከታች ያስገቡ፡',
+    'checkout.telebirrInstructions': 'ክፍያውን ወደ ቴሌብር 0911-234-567 (ፅዮን ባልትና) ይላኩ። የማረጋገጫ ቁጥሩን ከታች ያስገቡ፡',
     'checkout.cbeInstructions': 'ወደ ኢትዮጵያ ንግድ ባንክ 1000-2491-0391 ያስተላልፉ። የትራንዛክሽን ቁጥር ከታች ያስገቡ፡',
     'checkout.referencePlaceholder': 'የትራንዛክሽን ማረጋገጫ ቁጥር',
     'checkout.placeOrder': 'ትዕዛዙን አረጋግጥ',
@@ -233,7 +233,7 @@ export const translations: Record<Language, Record<string, string>> = {
     'status.CANCELLED': 'ተሰርዟል',
 
     // Admin
-    'admin.title': 'የአዲስ ባልትና አስተዳዳሪ ሰሌዳ',
+    'admin.title': 'የፅዮን ባልትና አስተዳዳሪ ሰሌዳ',
     'admin.totalRevenue': 'ጠቅላላ ገቢ',
     'admin.totalOrders': 'ጠቅላላ ትዕዛዞች',
     'admin.activeOrders': 'በሂደት ላይ ያሉ',
@@ -261,7 +261,7 @@ export const translations: Record<Language, Record<string, string>> = {
   },
   om: {
     // Brand & Header
-    'brand.name': 'Finfinnee Baltina',
+    'brand.name': 'Tsiyon Baltina',
     'brand.tagline': 'Urgooftuu fi Mi\'eessituu Aadaa Itoophiyaa',
     'nav.catalog': 'Oomishaalee',
     'nav.orders': 'Ajaja Hordofi',
@@ -277,7 +277,7 @@ export const translations: Record<Language, Record<string, string>> = {
     'hero.shopNow': 'Oomishaalee Ilaalaa',
     'hero.trackOrder': 'Ajaja Hordofaa',
     'hero.feature1': '100% Uumamaa fi Qulqulluu',
-    'hero.feature2': 'Dhiheessa Finfinnee Saffisaa',
+    'hero.feature2': 'Dhiheessa Adama Saffisaa',
     'hero.feature3': 'Telebirr fi Kaffaltii Harkaatiin',
 
     // Categories
@@ -362,7 +362,7 @@ export const translations: Record<Language, Record<string, string>> = {
     'status.CANCELLED': 'Haqameera',
 
     // Admin
-    'admin.title': 'Bulchiinsa Finfinnee Baltina',
+    'admin.title': 'Bulchiinsa Tsiyon Baltina',
     'admin.totalRevenue': 'Galii Waliigalaa',
     'admin.totalOrders': 'Ajaja Waliigalaa',
     'admin.activeOrders': 'Kan Hojjetamaa Jiran',

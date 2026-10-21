@@ -191,7 +191,7 @@ export const App: React.FC = () => {
                 <div className="w-7 h-7 rounded-lg bg-amber-600 text-stone-950 flex items-center justify-center font-black">
                   አ
                 </div>
-                <span className="font-bold text-stone-200 text-sm">Addis Baltina</span>
+                <span className="font-bold text-stone-200 text-sm">Tsion Baltina</span>
                 <span className="text-stone-500">· Addis Ababa, Ethiopia</span>
               </div>
               <div className="flex gap-4 text-stone-400 text-xs">

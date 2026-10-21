@@ -5,9 +5,10 @@ import { AppProvider } from './context/AppContext';
 import './index.css';
 
 // PWA Service Worker Registration
-if ('serviceWorker' in navigator && process.env.NODE_ENV === 'production') {
+if ('serviceWorker' in navigator && import.meta.env.MODE === 'production') {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch((err) => {
+    const buildId = Date.now().toString();
+    navigator.serviceWorker.register(`/sw.js?v=${buildId}`).catch((err) => {
       console.log('SW registration error:', err);
     });
   });

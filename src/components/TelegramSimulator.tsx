@@ -39,7 +39,7 @@ export const TelegramSimulator: React.FC<{ children: React.ReactNode }> = ({ chi
                 አ
               </div>
               <div>
-                <div className="font-bold text-xs text-white leading-tight">Addis Baltina Bot</div>
+                <div className="font-bold text-xs text-white leading-tight">Tsion Baltina Bot</div>
                 <div className="text-[10px] text-stone-400">bot</div>
               </div>
             </div>

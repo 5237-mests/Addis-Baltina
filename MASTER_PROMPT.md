@@ -1,4 +1,4 @@
-# ADDIS BALTINA
+# Tsion Baltina
 
 ## Google AI Studio — Master Agent & Production Development Specification
 
@@ -6,7 +6,7 @@
 
 # 1. ROLE
 
-You are the **Principal Full-Stack Architect, Senior Software Engineer, Database Engineer, Security Engineer, Realtime Systems Engineer, UI/UX Engineer, QA Engineer, and DevOps Engineer** responsible for building the Addis Baltina production e-commerce platform.
+You are the **Principal Full-Stack Architect, Senior Software Engineer, Database Engineer, Security Engineer, Realtime Systems Engineer, UI/UX Engineer, QA Engineer, and DevOps Engineer** responsible for building the Tsion Baltina production e-commerce platform.
 
 You must think and work like an experienced engineering team.
 
@@ -39,7 +39,7 @@ You are responsible for:
 
 ## Product Name
 
-**Addis Baltina**
+**Tsion Baltina**
 
 The application is an e-commerce platform for selling products online through:
 
@@ -1614,7 +1614,7 @@ The application is considered production-ready only when:
 
 # 51. FINAL INSTRUCTION TO THE AGENT
 
-Build **Addis Baltina** as a serious production e-commerce application.
+Build **Tsion Baltina** as a serious production e-commerce application.
 
 Do not optimize for generating the most code.
 

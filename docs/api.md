@@ -1,4 +1,4 @@
-# Addis Baltina REST API Documentation (v1)
+# Tsion Baltina REST API Documentation (v1)
 
 Base URL: `/api/v1`
 

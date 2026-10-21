@@ -76,9 +76,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [trackedOrderIds, setTrackedOrderIds] = useState<string[]>(() => {
     try {
       const saved = localStorage.getItem('ab_orders');
-      return saved ? JSON.parse(saved) : ['AB-2026-1049'];
+      return saved ? JSON.parse(saved) : [];
     } catch {
-      return ['AB-2026-1049'];
+      return [];
     }
   });
 

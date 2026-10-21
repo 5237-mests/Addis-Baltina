@@ -34,7 +34,7 @@ export const Header: React.FC = () => {
             }}
           >
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-red-700 flex items-center justify-center shadow-md border border-amber-400/30">
-              <span className="text-xl font-black text-stone-950">አ</span>
+              <span className="text-xl font-black text-stone-950">ፅ</span>
             </div>
             <div>
               <div className="flex items-center gap-2">
@@ -42,7 +42,7 @@ export const Header: React.FC = () => {
                   {t('brand.name')}
                 </span>
                 <span className="text-xs px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-medium border border-amber-500/30 hidden sm:inline-block">
-                  በአዲስ አበባ
+                  በአዳማ
                 </span>
               </div>
               <p className="text-[11px] text-stone-400 hidden sm:block leading-none">
@@ -69,11 +69,10 @@ export const Header: React.FC = () => {
                 <button
                   key={lang}
                   onClick={() => setLanguage(lang)}
-                  className={`px-2 py-1 text-xs font-semibold rounded transition ${
-                    language === lang
-                      ? 'bg-amber-600 text-stone-950 shadow-xs'
-                      : 'text-stone-400 hover:text-stone-200'
-                  }`}
+                  className={`px-2 py-1 text-xs font-semibold rounded transition ${language === lang
+                    ? 'bg-amber-600 text-stone-950 shadow-xs'
+                    : 'text-stone-400 hover:text-stone-200'
+                    }`}
                 >
                   {lang === 'en' ? 'EN' : lang === 'am' ? 'አማ' : 'OM'}
                 </button>
@@ -84,27 +83,24 @@ export const Header: React.FC = () => {
             <div className="hidden sm:flex items-center bg-stone-800/90 rounded-lg p-0.5 border border-stone-700">
               <button
                 onClick={() => setTheme('light')}
-                className={`p-1.5 rounded text-xs transition ${
-                  theme === 'light' ? 'bg-amber-500 text-stone-950' : 'text-stone-400 hover:text-stone-200'
-                }`}
+                className={`p-1.5 rounded text-xs transition ${theme === 'light' ? 'bg-amber-500 text-stone-950' : 'text-stone-400 hover:text-stone-200'
+                  }`}
                 title="Light"
               >
                 <Sun className="w-3.5 h-3.5" />
               </button>
               <button
                 onClick={() => setTheme('dark')}
-                className={`p-1.5 rounded text-xs transition ${
-                  theme === 'dark' ? 'bg-amber-500 text-stone-950' : 'text-stone-400 hover:text-stone-200'
-                }`}
+                className={`p-1.5 rounded text-xs transition ${theme === 'dark' ? 'bg-amber-500 text-stone-950' : 'text-stone-400 hover:text-stone-200'
+                  }`}
                 title="Dark"
               >
                 <Moon className="w-3.5 h-3.5" />
               </button>
               <button
                 onClick={() => setTheme('system')}
-                className={`p-1.5 rounded text-xs transition ${
-                  theme === 'system' ? 'bg-amber-500 text-stone-950' : 'text-stone-400 hover:text-stone-200'
-                }`}
+                className={`p-1.5 rounded text-xs transition ${theme === 'system' ? 'bg-amber-500 text-stone-950' : 'text-stone-400 hover:text-stone-200'
+                  }`}
                 title="System"
               >
                 <Laptop className="w-3.5 h-3.5" />
@@ -114,11 +110,10 @@ export const Header: React.FC = () => {
             {/* Telegram Mini App Simulator Toggle */}
             <button
               onClick={() => setIsTelegramMode(!isTelegramMode)}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg border transition ${
-                isTelegramMode
-                  ? 'bg-sky-600/30 text-sky-300 border-sky-500/50 ring-1 ring-sky-500/30'
-                  : 'bg-stone-800/70 text-stone-300 border-stone-700 hover:bg-stone-800'
-              }`}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg border transition ${isTelegramMode
+                ? 'bg-sky-600/30 text-sky-300 border-sky-500/50 ring-1 ring-sky-500/30'
+                : 'bg-stone-800/70 text-stone-300 border-stone-700 hover:bg-stone-800'
+                }`}
               title="Telegram Mini App view"
             >
               <Send className="w-3.5 h-3.5 text-sky-400" />
