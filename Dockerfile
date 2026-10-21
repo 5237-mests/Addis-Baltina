@@ -12,9 +12,8 @@ ENV NODE_ENV=production
 COPY package*.json ./
 RUN npm ci --omit=dev
 COPY --from=build /app/dist ./dist
-COPY server.ts ./
-COPY scripts ./scripts
-COPY src ./src
+COPY --from=build /app/dist-server ./dist-server
+COPY scripts/start.mjs ./scripts/start.mjs
 COPY .env.example .env.example
 EXPOSE 3000
 CMD ["npm", "start"]

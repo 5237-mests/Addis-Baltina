@@ -91,13 +91,14 @@ sudo chown "$USER":"$USER" /var/www/addis-baltina
 git clone <your-repo-url> /var/www/addis-baltina
 cd /var/www/addis-baltina
 
-npm ci            # WITH dev dependencies (tsx + vite are needed at runtime)
+npm ci             # dev deps needed once, to lint + build
 npm run lint
-npm run build     # → ./dist
+npm run build      # → ./dist (front end) + ./dist-server (server bundle)
+npm ci --omit=dev  # optional: prune dev deps; runtime only needs production deps
 ```
 
-> `npm ci --omit=dev` will break the app: `server.ts` imports `vite`, and
-> `npm start` runs through `tsx`. See
+> To skip installing dev dependencies on the server, build locally instead and
+> upload `./dist` + `./dist-server`. See
 > [deployment.md §4.3](./deployment.md#43-important-buildruntime-caveats).
 
 ---
@@ -185,7 +186,7 @@ User=www-data
 Group=www-data
 WorkingDirectory=/var/www/addis-baltina
 EnvironmentFile=/etc/addis-baltina/addis-baltina.env
-ExecStart=/usr/bin/npx tsx server.ts
+ExecStart=/usr/bin/node scripts/start.mjs
 Restart=always
 RestartSec=5
 # Sensible hardening
@@ -218,7 +219,7 @@ sudo npm install -g pm2
 
 # Load env vars into the shell/PM2, then start
 set -a; . /etc/addis-baltina/addis-baltina.env; set +a
-pm2 start "npx tsx server.ts" --name addis-baltina --time
+pm2 start scripts/start.mjs --name addis-baltina --time
 
 pm2 save
 pm2 startup systemd     # follow the printed instructions
@@ -295,24 +296,28 @@ service. HTTPS is required for the Telegram Mini App — see
 Docker makes the VPS deployment reproducible. It is **optional** for V1 and is
 not required by the shared-hosting target.
 
-Example `Dockerfile`:
+Example `Dockerfile` (multi-stage: build with dev deps, run with production
+deps only):
 
 ```dockerfile
-FROM node:22-slim
-
+# Multi-stage build
+FROM node:20-alpine AS build
 WORKDIR /app
-
-# Install dependencies WITH dev deps, because the server runs through tsx
-# and imports vite at module scope.
 COPY package*.json ./
 RUN npm ci
-
 COPY . .
-RUN npm run build
+RUN npm run build        # → ./dist (front end) + ./dist-server (server bundle)
 
+FROM node:20-alpine AS runtime
+WORKDIR /app
 ENV NODE_ENV=production
+COPY package*.json ./
+RUN npm ci --omit=dev
+COPY --from=build /app/dist ./dist
+COPY --from=build /app/dist-server ./dist-server
+COPY scripts/start.mjs ./scripts/start.mjs
 EXPOSE 3000
-CMD ["npx", "tsx", "server.ts"]
+CMD ["npm", "start"]     # = node scripts/start.mjs → dist-server/server.js
 ```
 
 Example `docker-compose.yml` (app + MySQL; add Redis later if desired):

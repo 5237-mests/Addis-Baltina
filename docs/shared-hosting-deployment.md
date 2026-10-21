@@ -51,29 +51,47 @@ Build on your machine, then upload the result. Building on the host is often
 slow and sometimes blocked.
 
 ```bash
-npm install          # with dev dependencies (tsx, vite are required)
+npm install          # with dev dependencies (vite + esbuild are required to build)
 npm run lint         # tsc --noEmit
-npm run build        # produces ./dist
+npm run build        # produces ./dist (front end) + ./dist-server (server bundle)
 ```
 
 You now have:
 
 ```
 ./dist                 ← built front end (upload this)
-server.ts              ← upload
-src/                   ← upload (server + client source; tsx compiles at runtime)
+./dist-server          ← compiled server bundle (upload this)
 package.json           ← upload
 package-lock.json      ← upload
-tsconfig.json          ← upload
-database/schema.sql    ← keep locally, import via phpMyAdmin
 public/                ← upload (source of manifest.json, sw.js, favicon.svg)
+database/schema.sql    ← keep locally, import via phpMyAdmin
 ```
 
-Do **not** upload on your local `.env`; configure secrets in the panel (§6).
+`server.ts`, `src/`, and `scripts/` do **not** need to be on the host: in
+production the server runs from the compiled `dist-server/server.js` bundle,
+which only needs the production `node_modules` (or nothing else, if the host
+installs for you).
+
+> **Why not run TypeScript with `tsx` on the host?** Earlier versions of this
+> guide ran `tsx server.ts` at runtime. `tsx` instantiates a **WebAssembly**
+> module lexer on startup, and on CloudLinux/LVE-limited shared hosting that
+> allocation is rejected — the process dies before serving anything:
+>
+> ```
+> RangeError: WebAssembly.instantiate(): Out of memory:
+> Cannot allocate Wasm memory for new instance
+> ```
+>
+> The compiled bundle (`npm run build:server`, plain esbuild output) contains
+> no transpiler and no WebAssembly, so it starts fine inside LVE limits — and
+> starts faster with a fraction of the memory.
+
+Do **not** upload your local `.env`; configure secrets in the panel (§6).
 
 > **Do not exclude `node_modules` if the host cannot run `npm install`.** If it
 > can run `npm install` (most Node selectors can), skip uploading
-> `node_modules` and install on the host instead. Uploading `node_modules` from
+> `node_modules` and install on the host instead — only production
+> dependencies are needed at runtime now. Uploading `node_modules` from
 > Windows to Linux can ship platform-specific binaries — prefer hosting-side
 > install when available.
 
@@ -101,8 +119,8 @@ Options, best first:
    `.git`, and optionally `node_modules`/`dist`) and upload + extract.
 3. **SFTP** — upload the folder tree with an SFTP client.
 
-After upload, the app directory should contain `server.ts`, `package.json`,
-`src/`, and `dist/` (if you built locally).
+After upload, the app directory should contain `package.json`, `dist/`, and
+`dist-server/` (built locally per §3).
 
 ---
 
@@ -150,44 +168,44 @@ SESSION_SECRET=<long-random-string>
 
 ## 7. Choose a start command / startup file
 
-Use whichever your panel supports.
+Use whichever your panel supports. All options run the same compiled bundle —
+plain `node` on `dist-server/server.js`, with `NODE_ENV=production` as the
+default. (The old `tsx server.ts` flow is gone: `tsx` loads a WebAssembly
+lexer that LVE-limited hosts reject with
+`RangeError: WebAssembly.instantiate(): Out of memory` — see §3.)
 
 ### Option A — Custom start command
 
 If the Node.js selector lets you define the startup command:
 
 ```bash
-NODE_ENV=production npx tsx server.ts
+npm start
 ```
 
 or, on Node 20.6+ with an `.env` file outside the web root:
 
 ```bash
-node --env-file=/home/USER/.env --import tsx server.ts
+node --env-file=/home/USER/.env scripts/start.mjs
 ```
 
 ### Option B — Passenger startup file
 
 Some panels require a JavaScript startup file instead of a command (the
-panel runs it with Node). Because the server is TypeScript, register the `tsx`
-loader first, then import `server.ts`. Create **`app.mjs`** in the app root:
+panel runs it with Node). Set the panel's **Application startup file** to:
+
+```text
+scripts/start.mjs
+```
+
+It is plain JavaScript (no TypeScript, no loader hooks): it defaults
+`NODE_ENV` to `production` and imports the compiled server bundle. If your
+panel insists the startup file sits in the app root, create **`app.mjs`**:
 
 ```js
 // app.mjs — Passenger startup shim for Tsion Baltina
 process.env.NODE_ENV ||= 'production';
-
-const { register } = await import('tsx/esm/api');
-register();
-
-await import('./server.ts');
+await import('./dist-server/server.js');
 ```
-
-Set the panel's **Application startup file** to `app.mjs`.
-
-> This relies on `tsx` (a dev dependency). Ensure it is installed on the host
-> (or present in `node_modules`) — see §3. If your provider forbids running
-> TypeScript at runtime, ask them, or use a host that runs the documented
-> `npm start`.
 
 ### Option C — Panel runs `npm start`
 
@@ -197,12 +215,12 @@ Some panels have a "Run NPM script" / "Start command" field. Use:
 npm start
 ```
 
-Note `npm start` is `NODE_ENV=production tsx server.ts`, which requires a
-POSIX shell (fine on Linux shared hosting).
+`npm start` is `node scripts/start.mjs`, which works on Linux, macOS, and
+Windows alike (no POSIX-only `NODE_ENV=...` prefix involved).
 
 **In all cases, the process must listen so the web server can proxy to it.**
-`server.ts` already binds `0.0.0.0:$PORT`; set `PORT` to whatever the panel
-assigns (often shown in the Node.js selector screen).
+The server binds `0.0.0.0:$PORT`; set `PORT` to whatever the panel assigns
+(often shown in the Node.js selector screen).
 
 ---
 
@@ -303,7 +321,8 @@ on shared hosting confirm:
 
 - **Restart** after changing env vars or uploading a new build (panel "Restart"
   button).
-- **Update**: upload the new build (`dist/` + changed source), then restart.
+- **Update**: rebuild locally (`npm run build`), upload the new `dist/` +
+  `dist-server/`, then restart.
 - **Logs**: rely on the panel's Node app log + the app's own stdout
   (`[API] METHOD /path` request logging is built in).
 - **Backups**: follow [backups.md](./backups.md); do not assume the host's
@@ -317,8 +336,10 @@ on shared hosting confirm:
 
 1. **No durable data yet** — the runtime uses the in-memory store
    ([deployment.md §6.1](./deployment.md#6-database)).
-2. **TypeScript at runtime** requires `tsx` (and `vite`, imported by
-   `server.ts`) to be installed; keep dev dependencies available.
+2. **Build before deploy** — the server runs from the compiled
+   `dist-server/server.js` bundle, not from TypeScript sources. Rebuild
+   locally (`npm run build`) whenever server code changes and upload the new
+   bundle. No dev dependencies are needed on the host.
 3. **Realtime may be degraded** — SSE can be capped by idle timeouts; the app
    degrades gracefully to REST refresh.
 4. **Single process** — do not run multiple workers against the in-memory

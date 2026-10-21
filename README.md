@@ -53,8 +53,10 @@ npm install
 # 2. Start development server
 npm run dev
 
-# 3. Build for production
+# 3. Build for production (front end → ./dist, server bundle → ./dist-server)
 npm run build
+
+# 4. Run the production build (plain node — no tsx needed at runtime)
 npm start
 ```
 

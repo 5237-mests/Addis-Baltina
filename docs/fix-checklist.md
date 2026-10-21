@@ -92,7 +92,11 @@ Status legend: `[ ]` open · `[~]` in progress · `[x]` done
   connections, and force-exit after a 10 s timeout.
 - [x] **Runtime dependency split.**
   - [x] `vite` is imported dynamically only when `NODE_ENV !== 'production'`.
-  - [x] `tsx` moved to `dependencies`, so `npm ci --omit=dev` still runs the app.
+  - [x] Production runs a pre-compiled server bundle (`npm run build:server`,
+        esbuild → `dist-server/server.js`) via `node scripts/start.mjs`;
+        `tsx` is dev-only again. This also fixes the CloudLinux/LVE crash
+        (`RangeError: WebAssembly.instantiate(): Out of memory`) that `tsx`'s
+        WebAssembly lexer triggers on cPanel shared hosting.
 - [~] **Write tests** (`npm test`, Vitest + supertest; 29 tests pass).
   - [x] Unit: pricing, delivery fee (≥1200 ETB free), idempotency, order-id
         uniqueness, bounded collections.
@@ -123,8 +127,9 @@ Status legend: `[ ]` open · `[~]` in progress · `[x]` done
   a request correlation id (matches the P0 error-response fix).
 - [ ] **`@types/express@5` vs `express@4`** type mismatch. Align versions to
   avoid silent type drift.
-- [ ] **`npm start` is POSIX-only** (`NODE_ENV=production tsx server.ts`) —
-  breaks on Windows `cmd`. Use a cross-platform approach or document.
+- [x] **`npm start` is cross-platform** — it is `node scripts/start.mjs`
+  (production server bundle); no POSIX-only `NODE_ENV=... tsx server.ts`
+  prefix anymore.
 - [ ] **`.env` is not loaded by the app** (no `dotenv`). Either load it
   explicitly or make the scripts use `node --env-file=.env` (Node 20.6+), so
   config behaviour is not host-dependent.

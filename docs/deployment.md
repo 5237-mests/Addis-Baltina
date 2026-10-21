@@ -127,8 +127,8 @@ npm install
 # 2. Type-check the project
 npm run lint          # = tsc --noEmit
 
-# 3. Produce the production front end in ./dist
-npm run build         # = vite build
+# 3. Produce the production front end (./dist) and server bundle (./dist-server)
+npm run build         # = vite build && esbuild server.ts → dist-server/server.js
 ```
 
 ### 4.2 Run
@@ -137,33 +137,27 @@ npm run build         # = vite build
 # Development (Vite middleware, hot reload)
 npm run dev           # = tsx server.ts
 
-# Production
-npm start             # = NODE_ENV=production tsx server.ts
+# Production (compiles ./dist + ./dist-server, then runs the bundle)
+npm run build
+npm start             # = node scripts/start.mjs
 ```
 
 ### 4.3 Important build/runtime caveats
 
-1. **`tsx` and `vite` must be present at runtime.**
-   `npm start` runs the TypeScript server through `tsx` (a `devDependency`), and
-   `server.ts` imports `vite` at module scope even in production. Therefore:
-   - do **not** run `npm install --omit=dev` / `npm ci --omit=dev`, and
-   - if the host strips dev dependencies, promote `tsx` and `vite` to
-     `dependencies`, or refactor `server.ts` to import `vite` dynamically only
-     when `NODE_ENV !== 'production'`.
+1. **Production runs a compiled bundle, not TypeScript.**
+   `npm run build` produces the front end (`./dist`) **and** a server bundle
+   (`./dist-server/server.js`, esbuild, dependencies left external).
+   `npm start` boots that bundle with plain `node` — no `tsx`, no
+   WebAssembly, no dev dependencies needed at runtime. Therefore
+   `npm ci --omit=dev` / `npm install --production` is safe in production.
+   If `./dist-server/server.js` is missing, `npm start` exits with a clear
+   "run `npm run build` first" error.
 
-2. **The `npm start` script is POSIX-only.**
-   `NODE_ENV=production tsx server.ts` does not work in Windows `cmd`. On
-   Windows use one of:
-
-   ```powershell
-   $env:NODE_ENV="production"; npx tsx server.ts
-   ```
-
-   ```cmd
-   set NODE_ENV=production&& npx tsx server.ts
-   ```
-
-   On a Linux host the script works as-is.
+2. **`npm start` works on every platform.**
+   It is `node scripts/start.mjs`, which defaults `NODE_ENV` to `production`
+   (an environment-provided `NODE_ENV` still wins) and then imports the
+   compiled bundle. There is no POSIX-only `NODE_ENV=... npm start` prefix
+   anymore; Windows `cmd`, PowerShell, and Linux all use the same command.
 
 3. **Build the front end before starting production.** With
    `NODE_ENV=production` the server serves `./dist`; if that folder is missing,
@@ -175,9 +169,10 @@ npm start             # = NODE_ENV=production tsx server.ts
 
 Minimum viable production setup:
 
-1. A Node process running `server.ts` (bound to `0.0.0.0:$PORT`).
+1. A Node process running the compiled server bundle
+   (`node dist-server/server.js` via `npm start`; bound to `0.0.0.0:$PORT`).
 2. A TLS-terminating reverse proxy or the host's HTTPS layer in front of it.
-3. The `dist/` folder present on disk (built in step §4.1).
+3. The `dist/` and `dist-server/` folders present on disk (built in §4.1).
 4. Cloudinary credentials (for persistent images) and a Telegram bot token (for
    the Mini App) if you use those features.
 
@@ -409,9 +404,10 @@ place** and should be addressed before handling public production traffic:
 
 | Symptom | Likely cause | Fix |
 | --- | --- | --- |
-| Server starts but the page is blank / 404 at `/` | Production mode without a build | Run `npm run build` so `./dist` exists, then restart. |
-| `Error: Cannot find module 'vite'` or `'tsx'` | Installed with `--omit=dev` | Reinstall with dev deps, or promote `tsx`/`vite` to `dependencies`. |
-| `'NODE_ENV' is not recognized as an internal or external command` | Windows `cmd` and a POSIX `npm start` script | Use PowerShell/`set`, or a Linux host. |
+| Server starts but the page is blank / 404 at `/` | Production mode without a front-end build | Run `npm run build` so `./dist` exists, then restart. |
+| `dist-server/server.js not found` on `npm start` | Server bundle not built yet | Run `npm run build` (or `npm run build:server`) and redeploy `dist-server/`. |
+| `RangeError: WebAssembly.instantiate(): Out of memory` | Running the server through `tsx` on an LVE-limited host (cPanel/CloudLinux) | Run the compiled bundle instead: `npm run build` locally, then `npm start` (`node scripts/start.mjs`). Never use `tsx` in production on shared hosting. |
+| `Error: Cannot find module 'vite'` | Dev-mode code path reached on a production install | Ensure `NODE_ENV=production` so the Vite middleware is never imported. |
 | Env vars seem ignored | `.env` is not auto-loaded | Export vars or start with `node --env-file=.env`. |
 | Data/orders disappear after restart | In-memory store (§6.1) | Expected until the MySQL persistence layer is implemented. |
 | `EventSource` errors in the browser console | SSE blocked or buffered by the host/proxy | Disable proxy buffering for `/api/v1/events`, raise read timeouts; otherwise rely on REST refresh. |
